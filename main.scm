@@ -405,10 +405,10 @@
 	)
 ))
 
-(define n-turns-analytically (lambda (n)
+(define n-turns-analytically (lambda (n acc)
 	(cond
-		((<= n 0) (begin (display "done.") (n-turns-analytically (read))))
-		((equal? ((g 'new-random)) 'game-over) (display "Game Over"))
+		((<= n 0) (begin (display "done.") acc))
+		((equal? ((g 'new-random)) 'game-over) (begin (display "Game Over") acc))
 		(#T 
 			((lambda (opt)
 			(begin
@@ -420,11 +420,19 @@
 				(newline)
 				(newline)
 				((g 'step) opt)
-				(n-turns-analytically (- n 1))
+				(n-turns-analytically (- n 1) (+ acc ((g 'analyze))))
 			)) ((g 'get-optimal) 5 0.7))
 		)
 	)
 ))
 
-(n-turns-analytically (read))
+;(n-turns-analytically (read))
+
+(define average (lambda (l)
+	(/ (reduce + 0 l) (length l))
+))
+
+(display (average (list (n-turns-analytically 100 0) (n-turns-analytically 100 0) (n-turns-analytically 100 0))))
+
+
 ;(turn)
