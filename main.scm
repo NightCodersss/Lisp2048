@@ -99,8 +99,11 @@
 		(#T (+ (* (car l1) (car l2)) (scalar (cdr l1) (cdr l2))))
 	)
 ))
+(define get-value (lambda (f i j)
+	(nth (nth f i) j)
+))
 
-(define Game2048 (lambda ()
+(define Game2048 (lambda (cl)
 	(let (
 		(f '((0 0 0 0) (0 0 0 0) (0 0 0 0) (0 0 0 0)))
 	)
@@ -167,9 +170,6 @@
 
 		(define get-f (lambda () f))
 
-		(define get-value (lambda (i j)
-			(nth (nth f i) j)
-		))
 		
 		(define set-value (lambda (i j v)
 			(define set-item (lambda (l j v)
@@ -218,7 +218,7 @@
 				((are-there-free-cells)
 					((lambda (pair)
 						(cond 
-							((> (get-value (car pair) (cdr pair)) 0) (new-random))
+							((> (get-value f (car pair) (cdr pair)) 0) (new-random))
 							(#T (set-value (car pair) (cdr pair) (+ (random 2) 1)))
 						)
 					) (cons (random 4) (random 4)))
@@ -279,32 +279,13 @@
 			))
 			
 			(define quantity-of-chain-pairs (lambda (f)
-				(define quantity-of-mergeable-pairs-in-line (lambda (l)
-					(cond
-						((<= (length l) 1) 0)
-						(#T (+ (cond ((= (abs (- (car l) (cadr l))) 1) 1) (#T 0)) 
-						       (quantity-of-mergeable-pairs-in-line (cdr l))
-						    )
-						)
-					)
-				))
-
-				(define quantity-of-horizontal-mergeable-pairs (lambda (f)
-					(cond
-						((equal? f '()) 0)
-						(#T (+ (quantity-of-mergeable-pairs-in-line (filter (lambda (x) (> x 0)) (car f))) 
-						       (quantity-of-horizontal-mergeable-pairs (cdr f))
-						    )
-						)
-					)
-				))
-
-				(+ (quantity-of-horizontal-mergeable-pairs f) (quantity-of-horizontal-mergeable-pairs (transpose f)))
+			;	(reduce + 0 (map (lambda (x) (* (- x 1) (- x 1))) (get-chains f)))
+				(get-chains f)
 			))
 
 			(scalar 
-				(list (free-quantity f) (quantity-of-mergeable-pairs f))
-				(list 0.7 0.3)
+				(list (free-quantity f) (quantity-of-mergeable-pairs f) (quantity-of-chain-pairs f))
+				cl
 			)
 		))
 			
@@ -315,7 +296,7 @@
 					((a 'new-random))
 					((a 'get-f))
 				)
-			) (Game2048) )
+			) (Game2048 cl) )
 		))
 
 		(define super-middle (lambda (l)
@@ -329,7 +310,7 @@
 						((a 'set-f) ft)
 						((a 'analyze))
 					      )
-					) (Game2048))
+					) (Game2048 cl))
 				)
 				(#T 
 					(super-middle (list 
@@ -389,7 +370,7 @@
 	) (read-char))
 ))
 
-(define g (Game2048))
+(define g (Game2048 (list 1.0 0.4 0.0005)))
 (define turn (lambda ()
 	(cond 
 		((equal? ((g 'new-random)) 'game-over) (display "Game Over"))
@@ -404,8 +385,91 @@
 		))
 	)
 ))
+(define addLists (lambda (ls)
+	(reduce addList '() ls)
+))
+(define addList (lambda (l1 l2)
+	(cond 
+		((equal? l1 '()) l2)
+		(#T (cons (car l1) (addList (cdr l1) l2)))
+	)
+))
 
-(define n-turns-analytically (lambda (n acc)
+(define without-ij (lambda (f i j)
+	(define without-ij-line (lambda (l j)
+		(cond
+			((equal? l '()) '())
+			((= j 0) (cons (- 2) (without-ij-line (cdr l) (- j 1))))
+			(#T (cons (car l) (without-ij-line (cdr l) (- j 1))))
+		)
+	))
+	(cond
+		((equal? f '()) '())
+		((= i 0) (cons (without-ij-line (car f) j) (without-ij (cdr f) (- i 1) j)))
+		(#T (cons (car f) (without-ij (cdr f) (- i 1) j)))
+	)
+))
+
+(define count-n (lambda (l n)
+	(reduce (lambda (x y) (+ x (cond ((= y n) 1) (#T 0)))) 0 l)
+))
+
+(define list-k-n (lambda (k n)
+	(cond 
+		((> n 0) (cons k (list-k-n k (- n 1))))
+		(#T '())
+	)
+))
+
+(define get-chains (lambda (f)
+	(define dfs (lambda (f x y)
+		(define get-cell (lambda (x y v xp yp)
+			(cond 
+				((or (< x 0) (< y 0) (> x 3) (> y 3)) 0)
+				((not (= (abs(- (get-value f x y) v )) 1)) 1)
+				(#T (dfs (without-ij f xp yp) x y))
+			)
+		))
+		(+ 
+			(get-cell (- x 1) (- y 0) (get-value f x y) x y)
+			(get-cell (+ x 1) (- y 0) (get-value f x y) x y)
+			(get-cell (- x 0) (- y 1) (get-value f x y) x y)
+			(get-cell (- x 0) (+ y 1) (get-value f x y) x y)
+		)	
+	))
+	(define loop2 (lambda (i j)
+		(cond 
+			((>= j 0)
+				(addLists (list
+					(dfs f i j)
+					(loop2 i (- j 1))
+				))
+			)
+			(#T '())
+		) 
+	))
+
+	(define loop1 (lambda (i)
+		(cond 
+			((>= i 0)
+				(addLists (list
+					(loop2 i 3)
+					(loop1 (- i 1)) 
+				))
+			)
+			(#T '())
+		)
+	))
+	(define vipilivalka (lambda (l n)
+		(cond
+			((> n 0) (addList (list-k-n n (/ (count-n l n) n)) (vipilivalka l (- n 1))))
+			(#T '())
+		)
+	))
+	(filter (lambda (x) (not (= x 1))) (vipilivalka (loop1 3) 16))
+))
+
+(define n-turns-analytically (lambda (g n acc)
 	(cond
 		((<= n 0) (begin (display "done.") acc))
 		((equal? ((g 'new-random)) 'game-over) (begin (display "Game Over") acc))
@@ -420,19 +484,96 @@
 				(newline)
 				(newline)
 				((g 'step) opt)
-				(n-turns-analytically (- n 1) (+ acc ((g 'analyze))))
-			)) ((g 'get-optimal) 5 0.7))
+				(n-turns-analytically g (- n 1) (+ acc ((g 'analyze))))
+			)) ((g 'get-optimal) 5 1.0))
 		)
 	)
 ))
 
-;(n-turns-analytically (read))
+;(n-turns-analytically g (read))
 
 (define average (lambda (l)
 	(/ (reduce + 0 l) (length l))
 ))
 
-(display (average (list (n-turns-analytically 100 0) (n-turns-analytically 100 0) (n-turns-analytically 100 0))))
+(define analyze-coefficients (lambda (l)
+	((lambda (g)
+		(average (list (n-turns-analytically g 30 0) (n-turns-analytically g 30 0) (n-turns-analytically g 30 0)))
+	)(Game2048 l))
+))
+
+(define set-1 (lambda (k n)
+	(cond
+		((= n 0) '())
+		((= k 0) (cons 1 (set-1 -1 (- n 1))))
+		(#T (cons 0 (set-1 (- k 1) (- n 1)))) 
+	)
+))
+
+(define vectorLength (lambda (l)
+	(sqrt (reduce + 0 (map (lambda (x) (* x x)) l)))
+))
+
+(define normalizeVector (lambda (v)
+	(map (lambda (x) (/ x (vectorLength v))) v)
+))
+
+(define multiplyVector (lambda (c v)
+	(map (lambda (x) (* x c)) v)
+))
+
+(define sum-of-lists (lambda (l1 l2)
+	(cond
+		((equal? l1 '()) '())
+		((equal? l2 '()) '())
+		(#T (cons (+ (car l1) (car l2)) (sum-of-lists (cdr l1) (cdr l2))))
+	)
+))
+
+(define grad (lambda (l dl dx)
+	(define nth-set (lambda (n)
+		(sum-of-lists l (multiplyVector (scalar dl (set-1 n (length l))) (set-1 n (length l))))
+	))
+	(define derivative (lambda (n gl0)
+		(/ 
+			(- (analyze-coefficients (nth-set n)) gl0) 
+			(scalar 
+				dl 
+				(set-1 n (length dl))
+			)
+		)
+	))
+	(define gradVector (lambda (i gl0)
+		(cond
+			((= i (length l)) '())
+			(#T (cons (derivative i gl0) (gradVector (+ i 1) gl0)))
+		)
+	))
+	((lambda (analyze)
+			(normalizeVector (sum-of-lists l (multiplyVector dx (normalizeVector analyze))))
+	) (gradVector 0 (analyze-coefficients l)) ) 
+))
+
+(define grad-n-times (lambda (n l dl dx)
+	(cond
+		((= n 0) l)
+		(#T (grad-n-times (- n 1) (grad (normalizeVector l) dl dx) dl dx))
+	)
+))
+
+;(display (grad-n-times 10 (list 1.0 0.1 0.001) (list 0.1 0.1 0.0001) 0.01))
+
+(n-turns-analytically g 1000 0)
+
+;((lambda (l)
+;	((lambda (gr)
+;		(begin
+;			(display gr)
+;			(display (sum-of-lists gr (map (lambda (x) (* x (- 1))) l)))
+;		)
+;	) (grad (normalizeVector l) (list 0.1 0.1 0.0001) 0.01))
+;) (list 1.0 0.1 0.001))
+;(display (average (list (n-turns-analytically g 100 0) (n-turns-analytically g 100 0) (n-turns-analytically g 100 0))))
 
 
 ;(turn)
