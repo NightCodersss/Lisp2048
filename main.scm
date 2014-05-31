@@ -1,3 +1,10 @@
+ (declare (usual-integrations))
+
+(define (parallel-execute . procs)
+  (map thread-wait
+         (map (lambda (proc) (thread proc))
+	             procs)))
+
 (define print (lambda (f) 
 	(cond 
 		((equal? f '()) (newline))
@@ -280,7 +287,7 @@
 			
 			(define quantity-of-chain-pairs (lambda (f)
 			;	(reduce + 0 (map (lambda (x) (* (- x 1) (- x 1))) (get-chains f)))
-				(get-chains f)
+				(get-max (get-chains f))
 			))
 
 			(scalar 
@@ -327,8 +334,7 @@
 			
 			((lambda (l)
 
-			(display l)
-			(newline)
+;			(display l)			(newline)
 
 			(nth (list #\a #\d #\w #\s) (index-of-max l))
 
@@ -370,7 +376,7 @@
 	) (read-char))
 ))
 
-(define g (Game2048 (list 1.0 0.4 0.0005)))
+(define g (Game2048 (list 3.0 0.4 0.0005)))
 (define turn (lambda ()
 	(cond 
 		((equal? ((g 'new-random)) 'game-over) (display "Game Over"))
@@ -435,13 +441,13 @@
 			(get-cell (+ x 1) (- y 0) (get-value f x y) x y)
 			(get-cell (- x 0) (- y 1) (get-value f x y) x y)
 			(get-cell (- x 0) (+ y 1) (get-value f x y) x y)
-		)	
+		)
 	))
 	(define loop2 (lambda (i j)
 		(cond 
 			((>= j 0)
 				(addLists (list
-					(dfs f i j)
+					(list (dfs f i j))
 					(loop2 i (- j 1))
 				))
 			)
@@ -461,9 +467,12 @@
 		)
 	))
 	(define vipilivalka (lambda (l n)
-		(cond
-			((> n 0) (addList (list-k-n n (/ (count-n l n) n)) (vipilivalka l (- n 1))))
-			(#T '())
+		(begin 
+;			(display l)
+			(cond
+				((> n 0) (addList (list-k-n n (/ (count-n l n) n)) (vipilivalka l (- n 1))))
+				(#T '())
+			)
 		)
 	))
 	(filter (lambda (x) (not (= x 1))) (vipilivalka (loop1 3) 16))
@@ -471,21 +480,21 @@
 
 (define n-turns-analytically (lambda (g n acc)
 	(cond
-		((<= n 0) (begin (display "done.") acc))
-		((equal? ((g 'new-random)) 'game-over) (begin (display "Game Over") acc))
+		((<= n 0) (begin (display "n-turns-analytically done.") acc))
+		((equal? ((g 'new-random)) 'game-over) (begin (display "Game Over") (print ((g 'get-f))) acc))
 		(#T 
 			((lambda (opt)
 			(begin
-				(print ((g 'get-f)))
-				(display ((g 'analyze)))
-				(newline)
-				(display opt)
-				(newline)
-				(newline)
-				(newline)
+;				(print ((g 'get-f)))
+;				(display ((g 'analyze)))
+;				(newline)
+;				(display opt)
+;				(newline)
+;				(newline)
+;				(newline)
 				((g 'step) opt)
 				(n-turns-analytically g (- n 1) (+ acc ((g 'analyze))))
-			)) ((g 'get-optimal) 5 1.0))
+			)) ((g 'get-optimal) 1 1.0))
 		)
 	)
 ))
@@ -496,11 +505,19 @@
 	(/ (reduce + 0 l) (length l))
 ))
 
-(define analyze-coefficients (lambda (l)
-	((lambda (g)
-		(average (list (n-turns-analytically g 30 0) (n-turns-analytically g 30 0) (n-turns-analytically g 30 0)))
-	)(Game2048 l))
+(define n-lambda (lambda (l n)
+	(cond
+		((= n 0) '())
+		(#T (cons (l) (n-lambda l (- n 1))))
+	)
 ))
+
+(define analyze-coefficients (lambda (l n)
+	((lambda (ll)
+		(* 1.0 (begin (display ll) (newline) (average ll)))
+	) (n-lambda (lambda () (play-to-game-over (Game2048 l))) n))
+))
+
 
 (define set-1 (lambda (k n)
 	(cond
@@ -536,7 +553,7 @@
 	))
 	(define derivative (lambda (n gl0)
 		(/ 
-			(- (analyze-coefficients (nth-set n)) gl0) 
+			(- (analyze-coefficients (nth-set n) 30) gl0) 
 			(scalar 
 				dl 
 				(set-1 n (length dl))
@@ -551,19 +568,51 @@
 	))
 	((lambda (analyze)
 			(normalizeVector (sum-of-lists l (multiplyVector dx (normalizeVector analyze))))
-	) (gradVector 0 (analyze-coefficients l)) ) 
+	) (gradVector 0 (analyze-coefficients l 30)) ) 
 ))
 
 (define grad-n-times (lambda (n l dl dx)
-	(cond
-		((= n 0) l)
-		(#T (grad-n-times (- n 1) (grad (normalizeVector l) dl dx) dl dx))
+	(begin
+		(display "l is: ")
+		(display l)
+		(newline)
+		(display (analyze-coefficients l 30))
+		(newline)
+		(cond
+			((<= n 0) l)
+			(#T (grad-n-times (- n 1) (grad (normalizeVector l) dl dx) dl dx))
+		)
 	)
 ))
 
-;(display (grad-n-times 10 (list 1.0 0.1 0.001) (list 0.1 0.1 0.0001) 0.01))
+(define play-to-game-over (lambda (g)
+	(cond
+		((equal? ((g 'new-random)) 'game-over) 0)
+		(#T 
+			(begin
+				((g 'step) ((g 'get-optimal) 1 1.0))
+				(+ 1 (play-to-game-over g))
+			)
+		)
+	)
+))
 
-(n-turns-analytically g 1000 0)
+;(grad-n-times 10 (list 1.0 0.1 0.001) (list 0.1 0.1 0.0001) 0.01)
+
+;(define gg (Game2048 (grad-n-times 100 (list 3.0 1.0 0.0005) (list 0.1 0.1 0.0001) 0.01)))
+
+;(display (analyze-coefficients (list 3.0 0.7 0.0005)))
+;(newline)
+;(display (analyze-coefficients (list 3.0 0.7 0.0005)))
+;(newline)
+;(display (analyze-coefficients (list 3.0 0.7 0.0005)))
+;(newline)
+;(display (analyze-coefficients (list 3.0 0.7 0.0005)))
+;(newline)
+;(display (analyze-coefficients (list 3.0 0.7 0.0005)))
+;(newline)
+
+;(n-turns-analytically gg 1000 0)
 
 ;((lambda (l)
 ;	((lambda (gr)
