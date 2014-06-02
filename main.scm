@@ -1,4 +1,6 @@
- (declare (usual-integrations))
+(declare (usual-integrations))
+
+(load "utility")
 
 (define (parallel-execute . procs)
   (map thread-wait
@@ -46,33 +48,6 @@
 	)
 ))
 	
-(define nth (lambda (l n)
-	(cond
-		((equal? l '()) '())
-		((= n 0) (car l))
-		(#T (nth (cdr l) (- n 1)))
-	)
-))
-	
-(define get-max (lambda (l)
-	(cond
-		((equal? l '()) -1)
-		(#T (max (car l) (get-max (cdr l))))
-	)
-))
-
-(define get-index (lambda (l v n)
-	(cond
-		((equal? l '()) -1)
-		((= v (car l)) n)
-		(#T (get-index (cdr l) v (+ n 1)))
-	)
-))
-
-(define index-of-max (lambda (l)
-	(get-index l (get-max l) 0)
-))
-		
 (define transpose (lambda (h)
 
 	(define iter (lambda (h n)
@@ -90,21 +65,6 @@
 	))
 
 	(iter2 h 0)
-))
-
-(define reduce (lambda (f acc l)
-	(cond
-		((equal? l '()) acc)
-		(#T (reduce f (f acc (car l)) (cdr l)))
-	)
-))
-
-(define scalar (lambda (l1 l2)
-	(cond
-		((equal? l1 '()) 0)
-		((equal? l2 '()) 0)
-		(#T (+ (* (car l1) (car l2)) (scalar (cdr l1) (cdr l2))))
-	)
 ))
 (define get-value (lambda (f i j)
 	(nth (nth f i) j)
@@ -391,16 +351,6 @@
 		))
 	)
 ))
-(define addLists (lambda (ls)
-	(reduce addList '() ls)
-))
-(define addList (lambda (l1 l2)
-	(cond 
-		((equal? l1 '()) l2)
-		(#T (cons (car l1) (addList (cdr l1) l2)))
-	)
-))
-
 (define without-ij (lambda (f i j)
 	(define without-ij-line (lambda (l j)
 		(cond
@@ -413,17 +363,6 @@
 		((equal? f '()) '())
 		((= i 0) (cons (without-ij-line (car f) j) (without-ij (cdr f) (- i 1) j)))
 		(#T (cons (car f) (without-ij (cdr f) (- i 1) j)))
-	)
-))
-
-(define count-n (lambda (l n)
-	(reduce (lambda (x y) (+ x (cond ((= y n) 1) (#T 0)))) 0 l)
-))
-
-(define list-k-n (lambda (k n)
-	(cond 
-		((> n 0) (cons k (list-k-n k (- n 1))))
-		(#T '())
 	)
 ))
 
@@ -499,53 +438,12 @@
 	)
 ))
 
-;(n-turns-analytically g (read))
-
-(define average (lambda (l)
-	(/ (reduce + 0 l) (length l))
-))
-
-(define n-lambda (lambda (l n)
-	(cond
-		((= n 0) '())
-		(#T (cons (l) (n-lambda l (- n 1))))
-	)
-))
-
 (define analyze-coefficients (lambda (l n)
 	((lambda (ll)
 		(* 1.0 (begin (display ll) (newline) (average ll)))
 	) (n-lambda (lambda () (play-to-game-over (Game2048 l))) n))
 ))
 
-
-(define set-1 (lambda (k n)
-	(cond
-		((= n 0) '())
-		((= k 0) (cons 1 (set-1 -1 (- n 1))))
-		(#T (cons 0 (set-1 (- k 1) (- n 1)))) 
-	)
-))
-
-(define vectorLength (lambda (l)
-	(sqrt (reduce + 0 (map (lambda (x) (* x x)) l)))
-))
-
-(define normalizeVector (lambda (v)
-	(map (lambda (x) (/ x (vectorLength v))) v)
-))
-
-(define multiplyVector (lambda (c v)
-	(map (lambda (x) (* x c)) v)
-))
-
-(define sum-of-lists (lambda (l1 l2)
-	(cond
-		((equal? l1 '()) '())
-		((equal? l2 '()) '())
-		(#T (cons (+ (car l1) (car l2)) (sum-of-lists (cdr l1) (cdr l2))))
-	)
-))
 
 (define grad (lambda (l dl dx)
 	(define nth-set (lambda (n)
@@ -596,33 +494,3 @@
 		)
 	)
 ))
-
-;(grad-n-times 10 (list 1.0 0.1 0.001) (list 0.1 0.1 0.0001) 0.01)
-
-;(define gg (Game2048 (grad-n-times 100 (list 3.0 1.0 0.0005) (list 0.1 0.1 0.0001) 0.01)))
-
-;(display (analyze-coefficients (list 3.0 0.7 0.0005)))
-;(newline)
-;(display (analyze-coefficients (list 3.0 0.7 0.0005)))
-;(newline)
-;(display (analyze-coefficients (list 3.0 0.7 0.0005)))
-;(newline)
-;(display (analyze-coefficients (list 3.0 0.7 0.0005)))
-;(newline)
-;(display (analyze-coefficients (list 3.0 0.7 0.0005)))
-;(newline)
-
-;(n-turns-analytically gg 1000 0)
-
-;((lambda (l)
-;	((lambda (gr)
-;		(begin
-;			(display gr)
-;			(display (sum-of-lists gr (map (lambda (x) (* x (- 1))) l)))
-;		)
-;	) (grad (normalizeVector l) (list 0.1 0.1 0.0001) 0.01))
-;) (list 1.0 0.1 0.001))
-;(display (average (list (n-turns-analytically g 100 0) (n-turns-analytically g 100 0) (n-turns-analytically g 100 0))))
-
-
-;(turn)
