@@ -79,7 +79,10 @@
 ))
 
 (define normalizeVector (lambda (v)
-	(map (lambda (x) (/ x (vectorLength v))) v)
+	(cond 
+		((= (vectorLength v) 0) (map (lambda (x) 0) v))
+		(#T (map (lambda (x) (/ x (vectorLength v))) v))
+	)
 ))
 
 (define multiplyVector (lambda (c v)

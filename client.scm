@@ -33,13 +33,20 @@
 		(define send-calculations-n-times (lambda (l n response)
 			(send-command (list 'analyze-coefficients l n) response) 
 		))
+
+		(define get-name (lambda ()
+			(string-append host ":" (number->string port 10))
+		))
+
 		(define dispatch (lambda (m)
 			(cond
 				((equal? m 'is-idle) is-idle)
 				((equal? m 'send-command) send-command)
 				((equal? m 'send-calculations-n-times) send-calculations-n-times)
+				((equal? m 'get-name) get-name)
 			)
 		))
+		dispatch
 	)
 ))
 
@@ -65,20 +72,24 @@
 		))
 
 		(define get-result (lambda (l n response)
-			(cond
-				((> n 1000) (begin
-						(get-result-pure l 1000 response)
-						(get-result (l (- n 1000) response))
-					    )
+			(begin
+			;	(message "get-result" l n)
+				(cond
+					((> n 1000) (begin
+							(get-result-pure l 1000 response)
+							(get-result l (- n 1000) response)
+						    )
+					)
+					(#T (get-result-pure l n response))
 				)
-				(#T (get-result-pure l n response))
 			)
 		))
 
 		(define get-task (lambda ()
 			(let ((result (car commands-queue)))
 				(begin
-					(set! commands-queue (cdr (commands-queue))) 
+					(set! commands-queue (cdr commands-queue)) 
+			;		(message "get-task result: " result "get-task commands-queue: " commands-queue)
 					result
 				)
 			)
@@ -86,18 +97,23 @@
 
 		(define watcher-loop (lambda ()
 			(begin
+;				(apply message (cons "Watcher loop" (map (lambda (serv) ((serv 'is-idle))) serverlist)))
+			;	(message "Command queue: " commands-queue)
 				(sleep-current-thread 10)
 				(cond
 					((equal? commands-queue '()) '())
 					(#T
 						(let ((idle-server (get-idle-server)))
+							(begin
 							(cond 
 								((equal? idle-server 'no-server) '())
 					 			(#T 
 									(let ((task (get-task)))
+										(message "Task: " task)
 										(apply (idle-server (car task)) (cdr task))
 									)
 								)
+							)
 							)
 						)
 					) 
@@ -133,6 +149,7 @@
 				((equal? m 'alldone) alldone)
 			)
 		))
+		dispatch
 	)
 ))
 
@@ -149,6 +166,7 @@
 			(gen-server-list "localhost" 1080 4)
 		   ))
 )
+((watch 'start-loop))
 
 (define pool0 (cons 0 0))
 (define pool1 (cons 0 0))
@@ -247,17 +265,9 @@
 	)
 ))
 (define gen-new-l (lambda ()
-	(set! l (sum-of-lists l (multiplyVector step (gradient))))
+	(set! l (sum-of-lists l (multiplyVector step (pool-gradient))))
 ))
-(define alldone (lambda ()
-	(and 
-		(<= quantity-of-games (cdr pool0))
-		(<= quantity-of-games (cdr pool1))
-		(<= quantity-of-games (cdr pool2))
-		(<= quantity-of-games (cdr pool3))
-	)
-))
-(define l (list 3. 1. ))
+(define l (list 3. 1. 0.05))
 (define dl (list 0.1 0.1 0.001))
 (define step 0.1)
 (define quantity-of-games 10000)
@@ -266,7 +276,8 @@
 (define updatepool (lambda ()
 	(begin 
 		(cond 
-			((alldone) (begin 
+			( ((watch 'alldone)) (begin 
+				;	(message "alldone is " 
 					(gen-new-l)
 					(reset-pools)
 					(get-full-result (car l) (cadr l) (caddr l) (car dl) (cadr dl) (caddr dl) quantity-of-games)

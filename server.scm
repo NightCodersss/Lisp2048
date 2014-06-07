@@ -1,7 +1,5 @@
-(cf "main")
 (load "main")
 
-(define test (lambda (x) (+ x 1)))
 (define clientloop (lambda (cfd env)
 	(let 
 		((instring (read-string (char-set #\linefeed) cfd)))
